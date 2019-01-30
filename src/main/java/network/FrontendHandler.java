@@ -1,23 +1,32 @@
 package network;
 
-import models.Statistics;
-import models.Server;
-import models.ServerPool;
+import java.net.InetSocketAddress;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.jboss.netty.bootstrap.ClientBootstrap;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
-import org.jboss.netty.channel.*;
+import org.jboss.netty.channel.Channel;
+import org.jboss.netty.channel.ChannelFuture;
+import org.jboss.netty.channel.ChannelFutureListener;
+import org.jboss.netty.channel.ChannelHandlerContext;
+import org.jboss.netty.channel.ChannelStateEvent;
+import org.jboss.netty.channel.ExceptionEvent;
+import org.jboss.netty.channel.MessageEvent;
+import org.jboss.netty.channel.SimpleChannelHandler;
 import org.jboss.netty.channel.group.ChannelGroup;
 import org.jboss.netty.channel.socket.ClientSocketChannelFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.InetSocketAddress;
-import java.util.concurrent.atomic.AtomicBoolean;
+import models.ClientInfo;
+import models.Server;
+import models.ServerPool;
+import models.Statistics;
 
 public class FrontendHandler extends SimpleChannelHandler {
 
-    private static final Logger log = LoggerFactory.getLogger(FrontendHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(FrontendHandler.class);    
     private static final int TIMEOUT_IN_MILLIS = 100;
     private volatile Channel outboundChannel;
 
@@ -42,8 +51,11 @@ public class FrontendHandler extends SimpleChannelHandler {
         cb.setOption("tcpNoDelay", true);
         cb.setOption("connectTimeMillis", TIMEOUT_IN_MILLIS);
         cb.getPipeline().addLast("handler", new BackendHandler(e.getChannel()));
-
-        final Server server = this.serverPool.selectServer();
+        ClientInfo cinfo = new ClientInfo();
+        cinfo.remoteAddr = inboundChannel.getRemoteAddress().toString();
+        InetSocketAddress isa = (InetSocketAddress)inboundChannel.getRemoteAddress();
+        cinfo.ip = isa.getHostString();
+        final Server server = this.serverPool.selectServer(cinfo);
 
 
         ChannelFuture f = cb.connect(new InetSocketAddress(server.getHostname(), server.getPort()));
@@ -53,11 +65,11 @@ public class FrontendHandler extends SimpleChannelHandler {
         f.addListener(new ChannelFutureListener() {
             public void operationComplete(ChannelFuture future) throws Exception {
                 if (future.isSuccess()) {
-                    log.debug("Connection attempt succeeded: begin to accept incoming traffic.");
+                    log.info("Connection attempt succeeded: begin to accept incoming traffic.");
                     statistics.addFrontendConnection();
                     inboundChannel.setReadable(true);
                 } else {
-                    log.debug("Unable to connect to {}:{}", server.getHostname(), server.getPort());
+                    log.info("Unable to connect to {}:{}", server.getHostname(), server.getPort());
                     log.info("Setting {}:{} availability to false", server.getHostname(), server.getPort());
                     server.setAvailable(new AtomicBoolean(false));
                     // Close the connection if the connection attempt has failed.
@@ -70,8 +82,12 @@ public class FrontendHandler extends SimpleChannelHandler {
     @Override
     public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) {
         ChannelBuffer msg = (ChannelBuffer) e.getMessage();
+        ChannelBuffer m2 = msg.copy();
         this.statistics.addBytes(msg.readableBytes());
         this.outboundChannel.write(msg);
+        byte[] a = new byte[1024];
+        m2.getBytes(0, a, 0, m2.readableBytes());
+       log.info(new String(a)+":"+ctx.getChannel().getRemoteAddress());
     }
 
     @Override
@@ -88,7 +104,7 @@ public class FrontendHandler extends SimpleChannelHandler {
     public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e) throws Exception {
         Channel channel = e.getChannel();
         if (channel.isConnected()) {
-            log.debug("Exception caught connecting to {}. {}", channel.getRemoteAddress(), e.getCause());
+            log.error("Exception caught connecting to {}. {}", channel.getRemoteAddress(), e.getCause());
             channel.write(ChannelBuffers.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
         }
     }

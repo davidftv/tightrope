@@ -1,5 +1,6 @@
 package strategies;
 
+import models.IClientInfo;
 import models.Server;
 import models.ServerPool;
 
@@ -10,13 +11,11 @@ public class RandomStrategy implements LoadBalancerStrategy {
 
     private final String NAME = "Random";
 
-    @Override
-    public Server selectServer(final ServerPool serverPool) {
+    public Server selectServer(final ServerPool serverPool,IClientInfo cinfo) {
         List<Server> serverList = serverPool.getAvailableServers();
         return serverList.get(new Random().nextInt(serverList.size()));
     }
 
-    @Override
     public String getName() {
         return NAME;
     }

@@ -22,8 +22,8 @@ public class ServerPool {
         log.info("Initializing server pool with {} strategy", this.loadBalancerStrategy.getName());
     }
 
-    public Server selectServer() {
-        return this.loadBalancerStrategy.selectServer(this);
+    public Server selectServer(IClientInfo cinfo) {
+        return this.loadBalancerStrategy.selectServer(this,cinfo);
     }
 
     public List<Server> getServers() {

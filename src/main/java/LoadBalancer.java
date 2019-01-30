@@ -1,7 +1,9 @@
-import models.Statistics;
-import models.Server;
-import models.ServerPool;
-import network.FrontendHandler;
+import static java.lang.Thread.sleep;
+
+import java.net.InetSocketAddress;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+
 import org.jboss.netty.bootstrap.ServerBootstrap;
 import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelPipeline;
@@ -14,14 +16,13 @@ import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
 import org.jboss.netty.channel.socket.nio.NioServerSocketChannelFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import models.Server;
+import models.ServerPool;
+import models.Statistics;
+import network.FrontendHandler;
+import strategies.IPStickStrategy;
 import strategies.LoadBalancerStrategy;
-import strategies.RoundRobinStrategy;
-
-import java.net.InetSocketAddress;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
-
-import static java.lang.Thread.sleep;
 
 public class LoadBalancer {
 
@@ -49,7 +50,7 @@ public class LoadBalancer {
         allChannels = new DefaultChannelGroup("handler");
 
         bootstrap.setPipelineFactory(new ChannelPipelineFactory() {
-            @Override
+   
             public ChannelPipeline getPipeline() throws Exception {
                 return Channels.pipeline(new FrontendHandler(allChannels, clientSocketChannelFactory, serverPool, statistics));
             }
@@ -74,10 +75,9 @@ public class LoadBalancer {
     }
 
     public static void main(String[] args) throws InterruptedException {
-        final LoadBalancerStrategy loadBalancerStrategy = new RoundRobinStrategy();
+        final LoadBalancerStrategy loadBalancerStrategy = new IPStickStrategy();
         final ServerPool serverPool = new ServerPool(loadBalancerStrategy);
-        serverPool.addServer(new Server("10.0.0.100", 8080));
-        serverPool.addServer(new Server("10.0.0.201", 8080));
+        serverPool.addServer(new Server("39.96.59.215", 9162));
         final LoadBalancer loadBalancer = new LoadBalancer(serverPool, 9000);
         loadBalancer.start();
         Thread shutdownHook = new Thread() {

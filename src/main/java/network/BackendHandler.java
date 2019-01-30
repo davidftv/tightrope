@@ -18,6 +18,7 @@ public class BackendHandler extends SimpleChannelHandler {
 
     @Override
     public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) throws Exception {
+    	log.error(e.getMessage().toString());
         this.frontendChannel.write(e.getMessage());
     }
 
@@ -33,7 +34,7 @@ public class BackendHandler extends SimpleChannelHandler {
     public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e) throws Exception {
         Channel channel = e.getChannel();
         if (channel.isConnected()) {
-            log.debug("Exception caught connecting to {}. {}", channel.getRemoteAddress(), e.getCause());
+            log.error("Exception caught connecting to {}. {}", channel.getRemoteAddress(), e.getCause());
             channel.write(ChannelBuffers.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
         }
     }
